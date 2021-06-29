@@ -1,8 +1,7 @@
 name: slider_gradient
 description: A new flutter plugin project.
 version: 0.0.1
-author:
-homepage:
+homepage: https://github.com/dilireba521/slider_gradient
 
 environment:
   sdk: ">=2.7.0 <3.0.0"
