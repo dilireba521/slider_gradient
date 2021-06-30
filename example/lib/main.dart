@@ -14,19 +14,12 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  String _platformVersion = 'Unknown';
-
-  @override
-  void initState() {
-    super.initState();
-  }
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       home: Scaffold(
         appBar: AppBar(
-          title: const Text('Plugin example app'),
+          title: const Text('slider_gradient'),
         ),
         body: Container(
             padding: EdgeInsets.all(20),
@@ -41,17 +34,29 @@ class _MyAppState extends State<MyApp> {
                 SizedBox(
                   height: 40,
                 ),
-                SliderGradient(
-                  beginColor: Colors.red,
-                  endColor: Colors.green,
-                ),
+                SliderGradient(),
                 SizedBox(
                   height: 40,
                 ),
                 SliderGradient(
                   isGradientBg: false,
-                  endColor: Colors.grey[300],
                   isShowLabel: true,
+                ),
+                SizedBox(
+                  height: 40,
+                ),
+                SliderGradient(
+                  onChangeEnd: (val) {
+                    print("object:${val.value}");
+                  },
+                  // isGradientBg: false,
+                  isShowLabel: true,
+                  colors: [
+                    // Theme.of(context).primaryColor,
+                    // Colors.red,
+                    // Colors.green,
+                    Colors.yellow
+                  ],
                 )
               ],
             )),

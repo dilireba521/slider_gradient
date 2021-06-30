@@ -1,8 +1,3 @@
-// You have generated a new plugin project without
-// specifying the `--platforms` flag. A plugin project supports no platforms is generated.
-// To add platforms, run `flutter create -t plugin --platforms <platforms> .` under the same
-// directory. You can also find a detailed instruction on how to add platforms in the `pubspec.yaml` at https://flutter.dev/docs/development/packages-and-plugins/developing-packages#plugin-platforms.
-
 import 'dart:async';
 
 import 'dart:math';
@@ -12,19 +7,25 @@ import 'package:flutter/material.dart';
 import 'model/label_style.dart';
 import 'model/track_style.dart';
 
-typedef SliderChangeCallback(int val);
+typedef SliderChangeCallback(SliderData data);
 enum SliderLocation { left, right }
+enum ColorFromARGB { a, r, g, b }
+
+class SliderData {
+  SliderData({this.trackColor, this.value});
+  int value;
+  Color trackColor;
+}
 
 class SliderGradient extends StatefulWidget {
   SliderGradient(
       {Key key,
       this.label,
-      this.isGradientBg = true,
       this.trackStyle = const TrackStyle(),
       this.labelStyle = const LabelStyle(),
-      this.beginColor,
       this.sliderHeight,
-      this.endColor,
+      this.isGradientBg = true,
+      this.colors,
       this.min = 0,
       this.max = 100,
       this.isShowLabel = false,
@@ -58,11 +59,8 @@ class SliderGradient extends StatefulWidget {
   ///是否展示label
   bool isShowLabel;
 
-  ///渐变开始颜色
-  Color beginColor;
-
-  ///渐变结束颜色
-  Color endColor;
+  ///渐变色数组
+  List<Color> colors;
 
   /// label样式自定义;
   LabelStyle labelStyle;
@@ -87,10 +85,8 @@ class _SliderGradientState extends State<SliderGradient> {
   String label;
   Color labelFillColor;
   int initValue;
-  int min;
-  int max;
-  Color beginColor;
-  Color endColor;
+  Color _beginColor;
+  Color _endColor;
   Color _trackColor;
   Color _trackBorderColor = Color(0xffE6E6E6);
   double _leftLocation;
@@ -115,23 +111,28 @@ class _SliderGradientState extends State<SliderGradient> {
   void initData() {
     _primaryColor = Theme.of(context).primaryColor;
     sliderHeight = widget.sliderHeight ?? 16;
-    min = widget.min;
-    max = widget.max;
-    beginColor = widget.beginColor ?? _primaryColor;
-    endColor = widget.endColor ?? Color(0xffffffff);
-    labelFillColor = widget.labelStyle.fillColor ?? beginColor;
+    _beginColor = widget.colors?.first ?? _primaryColor;
+    _endColor = widget.colors?.last ?? Color(0xffffffff);
+
+    if (widget.colors == null) {
+      widget.colors = [_beginColor, _endColor];
+    }
+    labelFillColor = widget.labelStyle.fillColor ?? _beginColor;
     trackHeight = widget.trackStyle.height;
     trackWidth = widget.trackStyle.width;
     if (widget.isShowLabel)
       _isShowLabel = true;
     else
       _isShowLabel = false;
-    Future.delayed(Duration(milliseconds: 100), () {
-      //初始化位置
-      _leftLocation =
-          ((initValue - min) / (max - min)) * _sliderWidth - trackWidth / 2;
-      _getTrackColor();
-    });
+    if (_leftLocation == null) {
+      Future.delayed(Duration(milliseconds: 100), () {
+        //初始化位置
+        _leftLocation = ((initValue - widget.min) / (widget.max - widget.min)) *
+                _sliderWidth -
+            trackWidth / 2;
+        _getTrackColor();
+      });
+    }
   }
 
   ///水平移动track
@@ -161,44 +162,43 @@ class _SliderGradientState extends State<SliderGradient> {
 
   ///根据track当前位置返回对应数值
   void getTrackVal(double val) {
-    int _currentVal =
-        (((_leftLocation + trackWidth / 2) / _sliderWidth) * (max - min))
-            .ceil();
-    if (_currentVal <= min / 100) {
-      initValue = min;
-    } else if (_currentVal >= max - min * 101 / 100) {
-      initValue = max;
+    int _currentVal = (((_leftLocation + trackWidth / 2) / _sliderWidth) *
+            (widget.max - widget.min))
+        .ceil();
+    if (_currentVal <= widget.min / 100) {
+      initValue = widget.min;
+    } else if (_currentVal >= widget.max - widget.min * 101 / 100) {
+      initValue = widget.max;
     } else {
-      initValue = _currentVal + min;
+      initValue = _currentVal + widget.min;
     }
     _getTrackColor();
   }
 
   ///track颜色获取
   void _getTrackColor() {
-    if (!widget.isGradientBg) {
-      _trackColor = beginColor;
+    if (!widget.isGradientBg ||
+        widget.colors == null ||
+        widget.colors.length < 2) {
+      _trackColor = _beginColor;
       setState(() {});
       return;
     }
-    int _redVal = endColor.red - beginColor.red;
-    int _greenVal = endColor.green - beginColor.green;
-    int _blueVal = endColor.blue - beginColor.blue;
-    int _alphaVal = endColor.alpha - beginColor.alpha;
-
-    _trackColor = Color.fromARGB(
-      _lerpInt(_alphaVal, beginColor.alpha),
-      _lerpInt(_redVal, beginColor.red),
-      _lerpInt(_greenVal, beginColor.green),
-      _lerpInt(_blueVal, beginColor.blue),
-    );
+    double _percent = ((_leftLocation + trackWidth / 2) / _sliderWidth);
+    int _len = widget.colors?.length ?? 2;
+    _trackColor = _lerp(_len, _percent);
     setState(() {});
   }
 
-  int _lerpInt(int val, int beginVal) {
-    double _percent = ((_leftLocation + trackWidth / 2) / _sliderWidth);
-    if (_percent >= 1) _percent = 1;
-    return (_percent * val).toInt() + beginVal;
+  ///根据百分比求出前后颜色
+  Color _lerp(int len, double percent) {
+    int _denominator = len - 1;
+    int _num = 1;
+    while (_num / _denominator < percent) {
+      _num++;
+    }
+    return Color.lerp(widget.colors[_num - 1], widget.colors[_num],
+        ((percent - (_num - 1) / _denominator) * _denominator).toDouble());
   }
 
   ///label样式
@@ -214,10 +214,10 @@ class _SliderGradientState extends State<SliderGradient> {
     Color _color;
 
     if (location == SliderLocation.left) {
-      _color = beginColor;
+      _color = _beginColor;
       _width = _width > _sliderWidth ? _sliderWidth : _width;
     } else if (location == SliderLocation.right) {
-      _color = endColor;
+      _color = _endColor;
       _width = _sliderWidth - _width;
     }
     return ClipRRect(
@@ -228,6 +228,11 @@ class _SliderGradientState extends State<SliderGradient> {
         color: _color,
       ),
     );
+  }
+
+  ///获取当前参数添加到回调函数内
+  SliderData dataCallback() {
+    return SliderData(trackColor: _trackColor, value: initValue);
   }
 
   @override
@@ -246,17 +251,18 @@ class _SliderGradientState extends State<SliderGradient> {
             handleClick(val);
           },
           onTapUp: (val) {
-            if (widget.onChangeEnd != null) widget.onChangeEnd(initValue);
+            if (widget.onChangeEnd != null) widget.onChangeEnd(dataCallback());
           },
           onHorizontalDragStart: (val) {
-            if (widget.onChangeBegin != null) widget.onChangeBegin(initValue);
+            if (widget.onChangeBegin != null)
+              widget.onChangeBegin(dataCallback());
           },
           onHorizontalDragUpdate: (val) {
             moveHrizontal(val);
-            if (widget.onChange != null) widget.onChange(initValue);
+            if (widget.onChange != null) widget.onChange(dataCallback());
           },
           onHorizontalDragEnd: (val) {
-            if (widget.onChangeEnd != null) widget.onChangeEnd(initValue);
+            if (widget.onChangeEnd != null) widget.onChangeEnd(dataCallback());
           },
           child: Container(
             // duration: Duration(milliseconds: 100),
@@ -292,12 +298,12 @@ class _SliderGradientState extends State<SliderGradient> {
       decoration: BoxDecoration(
           borderRadius: BorderRadius.all(Radius.circular(_sliderBorderRadius)),
           gradient: widget.isGradientBg
-              ? LinearGradient(colors: [
-                  beginColor,
-                  endColor,
-                ])
+              ? LinearGradient(
+                  colors: widget.colors == null || widget.colors.length < 2
+                      ? [_beginColor, _endColor]
+                      : widget.colors)
               : null,
-          color: widget.isGradientBg ? null : endColor),
+          color: widget.isGradientBg ? null : _endColor),
       child: !widget.isGradientBg
           ? Row(
               children: [
@@ -320,7 +326,7 @@ class _SliderGradientState extends State<SliderGradient> {
                   duration: Duration(milliseconds: 100),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.all(Radius.circular(4)),
-                    color: _trackColor ?? beginColor,
+                    color: _trackColor ?? _beginColor,
                     border: Border.all(color: _trackBorderColor, width: 2),
                   ),
                   width: trackWidth,
