@@ -6,4 +6,4 @@ Slider with gradient background
 
 #### image
 
-<img src="https://github.com/dilireba521/slider_gradient/blob/main/example/images/slider01.jpg" width="180" >
+<img src="https://github.com/dilireba521/slider_gradient/blob/main/example/images/slider01.gif" width="200" >

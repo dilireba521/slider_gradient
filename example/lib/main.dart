@@ -1,7 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:async';
-
-import 'package:flutter/services.dart';
 import 'package:slider_gradient/slider_gradient.dart';
 
 void main() {
@@ -14,6 +11,7 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
+  Color color;
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -26,16 +24,6 @@ class _MyAppState extends State<MyApp> {
             child: Column(
               children: [
                 SizedBox(
-                  height: 30,
-                ),
-                SliderGradient(
-                  isShowLabel: true,
-                ),
-                SizedBox(
-                  height: 40,
-                ),
-                SliderGradient(),
-                SizedBox(
                   height: 40,
                 ),
                 SliderGradient(
@@ -46,17 +34,14 @@ class _MyAppState extends State<MyApp> {
                   height: 40,
                 ),
                 SliderGradient(
-                  onChangeEnd: (val) {
-                    print("object:${val.value}");
-                  },
-                  // isGradientBg: false,
                   isShowLabel: true,
-                  colors: [
-                    // Theme.of(context).primaryColor,
-                    // Colors.red,
-                    // Colors.green,
-                    Colors.yellow
-                  ],
+                  label: "${color}",
+                  onChange: (val) {
+                    setState(() {
+                      color = val.thumbColor;
+                    });
+                  },
+                  colors: [Colors.red, Colors.green, Colors.yellow],
                 )
               ],
             )),
