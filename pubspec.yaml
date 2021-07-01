@@ -1,6 +1,6 @@
 name: slider_gradient
-description: A new flutter plugin project.
-version: 0.0.1
+description: A slider with gradient background color.
+version: 0.1.0
 homepage: https://github.com/dilireba521/slider_gradient
 
 environment:
@@ -30,6 +30,8 @@ flutter:
         package: com.example.slider_gradient
         pluginClass: SliderGradientPlugin
       ios:
+        pluginClass: SliderGradientPlugin
+      web:
         pluginClass: SliderGradientPlugin
     # -------------------
 
