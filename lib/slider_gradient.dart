@@ -18,14 +18,19 @@ class SliderGradient extends StatefulWidget {
       this.min = 0,
       this.max = 100,
       this.isShowLabel = false,
-      this.initValue,
-      this.onChange,
+      @required this.value,
+      @required this.onChange,
       this.onChangeBegin,
       this.onChangeEnd})
-      : super(key: key);
+      : assert(value != null),
+        assert(min != null),
+        assert(max != null),
+        assert(min <= max),
+        assert(value >= min && value <= max),
+        super(key: key);
 
   ///默认值
-  final int initValue;
+  int value;
 
   ///最小值
   final int min;
@@ -73,7 +78,6 @@ class _SliderGradientState extends State<SliderGradient> {
   double _sliderHeight;
   Color _labelFillColor;
   double _labelHeight;
-  int _initValue;
   Color _beginColor;
   Color _endColor;
   Color _thumbColor;
@@ -81,27 +85,12 @@ class _SliderGradientState extends State<SliderGradient> {
   double _sliderWidth; //
   double _sliderMinWidth = 140; //slider最小宽度
   double _sliderBorderRadius;
-  bool _isShowLabel; //手势控制时，label的状态
+  bool _isShowLabel = false; //手势控制时，label的状态
   Color _primaryColor;
   Duration _duration = Duration(milliseconds: 100); //动画时长
-  @override
-  void initState() {
-    super.initState();
-    if (widget.initValue == null || widget.min > widget.initValue) {
-      _initValue = widget.min;
-    } else if (widget.initValue > widget.max) {
-      _initValue = widget.max;
-    } else {
-      _initValue = widget.initValue;
-    }
-    if (widget.isShowLabel)
-      _isShowLabel = true;
-    else
-      _isShowLabel = false;
-  }
 
   ///初始化执行方法
-  void initData() {
+  void initData(BoxConstraints constraints) {
     _primaryColor = Theme.of(context).primaryColor;
     _sliderHeight = widget.sliderStyle.height;
     _sliderBorderRadius = widget.sliderStyle.radius;
@@ -113,20 +102,17 @@ class _SliderGradientState extends State<SliderGradient> {
     }
     _labelFillColor = widget.labelStyle.fillColor ?? _beginColor;
     _labelHeight = labelTextHeight(
-        "${widget.label ?? _initValue}", widget.labelStyle.size);
+        "${widget.label ?? widget.value}", widget.labelStyle.size);
     _thumbHeight = widget.thumbStyle.height;
     _thumbWidth = widget.thumbStyle.width;
-
-    if (_leftLocation == null) {
-      Future.delayed(Duration(milliseconds: 100), () {
-        //初始化位置
-        _leftLocation =
-            ((_initValue - widget.min) / (widget.max - widget.min)) *
-                    _sliderWidth -
-                _thumbWidth / 2;
-        _getthumbColor();
-      });
-    }
+    if (constraints.maxWidth == double.infinity)
+      _sliderWidth = _sliderMinWidth - _thumbWidth;
+    else
+      _sliderWidth = constraints.maxWidth - _thumbWidth;
+    _leftLocation = ((widget.value - widget.min) / (widget.max - widget.min)) *
+            _sliderWidth -
+        _thumbWidth / 2;
+    _getthumbColor();
   }
 
   ///水平移动thumb
@@ -160,11 +146,11 @@ class _SliderGradientState extends State<SliderGradient> {
             (widget.max - widget.min))
         .ceil();
     if (_currentVal <= widget.min / 100) {
-      _initValue = widget.min;
+      widget.value = widget.min;
     } else if (_currentVal >= widget.max - widget.min * 101 / 100) {
-      _initValue = widget.max;
+      widget.value = widget.max;
     } else {
-      _initValue = _currentVal + widget.min;
+      widget.value = _currentVal + widget.min;
     }
     _getthumbColor();
   }
@@ -175,19 +161,16 @@ class _SliderGradientState extends State<SliderGradient> {
         widget.colors == null ||
         widget.colors.length < 2) {
       _thumbColor = _beginColor;
-      setState(() {});
       return;
     }
     double _percent = ((_leftLocation + _thumbWidth / 2) / _sliderWidth);
     int _len = widget.colors?.length ?? 2;
     _thumbColor = _lerp(_len, _percent);
-    setState(() {});
   }
 
   ///判断数据变化时是否显示label
   void _isShowLabelClick(bool val) {
     if (widget.isShowLabel) _isShowLabel = val;
-    setState(() {});
   }
 
   ///根据百分比求出前后颜色
@@ -244,27 +227,25 @@ class _SliderGradientState extends State<SliderGradient> {
 
   ///获取当前参数添加到回调函数内
   SliderData dataCallback() {
-    return SliderData(thumbColor: _thumbColor, value: _initValue);
+    return SliderData(thumbColor: _thumbColor, value: widget.value);
   }
 
   @override
   Widget build(BuildContext context) {
-    initData();
     return LayoutBuilder(
         builder: (BuildContext context, BoxConstraints constraints) {
-      if (constraints.maxWidth == double.infinity)
-        _sliderWidth = _sliderMinWidth;
-      else
-        _sliderWidth = constraints.maxWidth;
+      initData(constraints);
       return ConstrainedBox(
         constraints: BoxConstraints(minWidth: _sliderMinWidth),
         child: GestureDetector(
           onTapDown: (val) {
             handleClick(val);
             _isShowLabelClick(true);
+            if (widget.onChange != null) widget.onChange(dataCallback());
           },
           onTapUp: (val) {
             if (widget.onChangeEnd != null) widget.onChangeEnd(dataCallback());
+            if (widget.onChange != null) widget.onChange(dataCallback());
             _isShowLabelClick(false);
           },
           onHorizontalDragStart: (val) {
@@ -277,11 +258,14 @@ class _SliderGradientState extends State<SliderGradient> {
           },
           onHorizontalDragEnd: (val) {
             if (widget.onChangeEnd != null) widget.onChangeEnd(dataCallback());
+            if (widget.onChange != null) widget.onChange(dataCallback());
             _isShowLabelClick(false);
           },
           child: Container(
+            padding:
+                EdgeInsets.only(left: _thumbWidth / 2, right: _thumbWidth / 2),
             height: _sliderHeight > _thumbHeight ? _sliderHeight : _thumbHeight,
-            width: _sliderWidth,
+            width: _sliderWidth + _thumbWidth,
             child: Stack(
               clipBehavior: Clip.none,
               alignment: AlignmentDirectional.center,
@@ -370,7 +354,8 @@ class _SliderGradientState extends State<SliderGradient> {
                 borderRadius: BorderRadius.all(Radius.circular(4)),
                 color: _labelFillColor,
               ),
-              child: Text("${widget.label ?? _initValue}", style: labelStyle()),
+              child:
+                  Text("${widget.label ?? widget.value}", style: labelStyle()),
             ),
             Transform.translate(
               offset: Offset(0, -5),

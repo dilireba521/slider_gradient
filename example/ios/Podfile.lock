@@ -1,0 +1,22 @@
+PODS:
+  - Flutter (1.0.0)
+  - slider_gradient (0.0.1):
+    - Flutter
+
+DEPENDENCIES:
+  - Flutter (from `Flutter`)
+  - slider_gradient (from `.symlinks/plugins/slider_gradient/ios`)
+
+EXTERNAL SOURCES:
+  Flutter:
+    :path: Flutter
+  slider_gradient:
+    :path: ".symlinks/plugins/slider_gradient/ios"
+
+SPEC CHECKSUMS:
+  Flutter: 434fef37c0980e73bb6479ef766c45957d4b510c
+  slider_gradient: 9684a26f1a1aecca997e2dec25cab4ad3d3b2d25
+
+PODFILE CHECKSUM: aafe91acc616949ddb318b77800a7f51bffa2a4c
+
+COCOAPODS: 1.9.3

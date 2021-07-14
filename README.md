@@ -12,7 +12,7 @@ Slider with gradient background
 
 | Name          | Type                 | Description                                                          | Default                                                                                   |
 | ------------- | -------------------- | -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| initValue     | int                  | Default value                                                        | Slider default minimum                                                                    |
+| value         | int                  | Default value                                                        | Slider default minimum                                                                    |
 | min           | int                  | Slider minimum                                                       | 0                                                                                         |
 | max           | int                  | Slider maximum                                                       | 100                                                                                       |
 | isShowLabel   | bool                 | Show the label on the slider                                         | false                                                                                     |
