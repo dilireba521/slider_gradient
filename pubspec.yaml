@@ -1,6 +1,6 @@
 name: slider_gradient
 description: A slider with gradient background color.
-version: 0.1.0
+version: 0.1.1
 homepage: https://github.com/dilireba521/slider_gradient
 
 environment:
