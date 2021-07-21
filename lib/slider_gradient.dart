@@ -84,6 +84,7 @@ class _SliderGradientState extends State<SliderGradient> {
   double _leftLocation;
   double _sliderWidth; //
   double _sliderMinWidth = 140; //slider最小宽度
+  double _sliderSideWidth = 15;
   double _sliderBorderRadius;
   bool _isShowLabel = false; //手势控制时，label的状态
   Color _primaryColor;
@@ -106,9 +107,9 @@ class _SliderGradientState extends State<SliderGradient> {
     _thumbHeight = widget.thumbStyle.height;
     _thumbWidth = widget.thumbStyle.width;
     if (constraints.maxWidth == double.infinity)
-      _sliderWidth = _sliderMinWidth - _thumbWidth;
+      _sliderWidth = _sliderMinWidth - _thumbWidth - 2 * _sliderSideWidth;
     else
-      _sliderWidth = constraints.maxWidth - _thumbWidth;
+      _sliderWidth = constraints.maxWidth - _thumbWidth - 2 * _sliderSideWidth;
     _leftLocation = ((widget.value - widget.min) / (widget.max - widget.min)) *
             _sliderWidth -
         _thumbWidth / 2;
@@ -131,12 +132,12 @@ class _SliderGradientState extends State<SliderGradient> {
 
   ///根据点击位置，对thumb位置做变换
   void _changethumbLocation(double val) {
-    if (val < -_thumbWidth / 2) {
+    if (val < _thumbWidth / 2 + _sliderSideWidth) {
       _leftLocation = -_thumbWidth / 2;
-    } else if (val >= _sliderWidth - _thumbWidth / 2) {
-      _leftLocation = _sliderWidth - _thumbWidth / 2;
+    } else if (val >= _sliderWidth + _thumbWidth + _sliderSideWidth) {
+      _leftLocation = _sliderWidth;
     } else {
-      _leftLocation = val;
+      _leftLocation = val - _thumbWidth - _sliderSideWidth;
     }
   }
 
@@ -262,10 +263,12 @@ class _SliderGradientState extends State<SliderGradient> {
             _isShowLabelClick(false);
           },
           child: Container(
-            padding:
-                EdgeInsets.only(left: _thumbWidth / 2, right: _thumbWidth / 2),
+            // color: Colors.red,
+            padding: EdgeInsets.only(
+                left: _thumbWidth / 2 + _sliderSideWidth,
+                right: _thumbWidth / 2 + _sliderSideWidth),
             height: _sliderHeight > _thumbHeight ? _sliderHeight : _thumbHeight,
-            width: _sliderWidth + _thumbWidth,
+            width: _sliderWidth + _thumbWidth + 2 * _sliderSideWidth,
             child: Stack(
               clipBehavior: Clip.none,
               alignment: AlignmentDirectional.center,

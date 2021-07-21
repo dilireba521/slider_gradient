@@ -37,39 +37,39 @@ class _MyHomePageState extends State<MyHomePage> {
         title: const Text('slider_gradient'),
       ),
       body: Container(
-          padding: EdgeInsets.all(20),
+          // padding: EdgeInsets.all(20),
           child: Column(
-            children: [
-              SizedBox(
-                height: 40,
-              ),
-              SliderGradient(
-                value: val1,
-                onChange: (valData) {
-                  setState(() {
-                    val1 = valData.value;
-                  });
-                },
-                isGradientBg: false,
-                isShowLabel: true,
-              ),
-              SizedBox(
-                height: 40,
-              ),
-              SliderGradient(
-                value: val2,
-                isShowLabel: true,
-                label: "${color ?? 0}",
-                onChange: (valData) {
-                  setState(() {
-                    color = valData.thumbColor;
-                    val2 = valData.value;
-                  });
-                },
-                colors: [Colors.red, Colors.green, Colors.yellow],
-              ),
-            ],
-          )),
+        children: [
+          SizedBox(
+            height: 40,
+          ),
+          SliderGradient(
+            value: val1,
+            onChange: (valData) {
+              setState(() {
+                val1 = valData.value;
+              });
+            },
+            isGradientBg: false,
+            isShowLabel: true,
+          ),
+          SizedBox(
+            height: 40,
+          ),
+          SliderGradient(
+            value: val2,
+            isShowLabel: true,
+            label: "${color ?? 0}",
+            onChange: (valData) {
+              setState(() {
+                color = valData.thumbColor;
+                val2 = valData.value;
+              });
+            },
+            colors: [Colors.red, Colors.green, Colors.yellow],
+          ),
+        ],
+      )),
     );
   }
 }
