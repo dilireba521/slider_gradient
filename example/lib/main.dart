@@ -28,8 +28,8 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   Color color;
-  int val1 = 40;
-  int val2 = 40;
+  double val1 = 40;
+  double val2 = 40;
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -60,10 +60,10 @@ class _MyHomePageState extends State<MyHomePage> {
             value: val2,
             isShowLabel: true,
             label: "${color ?? 0}",
-            onChange: (valData) {
+            onChange: (data) {
               setState(() {
-                color = valData.thumbColor;
-                val2 = valData.value;
+                val2 = data.value;
+                color = data.color;
               });
             },
             colors: [Colors.red, Colors.green, Colors.yellow],

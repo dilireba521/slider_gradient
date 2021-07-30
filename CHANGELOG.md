@@ -1,3 +1,11 @@
+## 0.2.0
+
+## 2021-07-30
+
+### Added
+
+- Optimize the implementation of plug-ins to reduce redundant manual calculation and active view update operations
+
 ## 0.1.1
 
 ## 2021-07-14
@@ -21,3 +29,4 @@
 ### Added
 
 - Initial release with basic support for iOS and Android
+  //1.对比，2.记录

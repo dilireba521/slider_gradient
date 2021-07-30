@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -30,7 +28,7 @@ class SliderGradient extends StatefulWidget {
         super(key: key);
 
   ///默认值
-  int value;
+  double value;
 
   ///最小值
   final int min;
@@ -53,8 +51,13 @@ class SliderGradient extends StatefulWidget {
   ///是否展示label
   final bool isShowLabel;
 
-  ///渐变色数组
+  ///当isGradientBg=true时为渐变色数组，
+  ///当isGradientBg=false时，不设置时slider主色调为系统当前主题色，辅助色为白色，
+  ///对colors进行设置时主色调取数组第一个，辅助色取最后一个
   List<Color> colors;
+
+  ///背景slider背景色是否为渐变色，默认为true
+  final bool isGradientBg;
 
   /// label样式自定义;
   final LabelStyle labelStyle;
@@ -65,113 +68,124 @@ class SliderGradient extends StatefulWidget {
   ///thumb样式
   final ThumbStyle thumbStyle;
 
-  ///背景slider背景色是否为渐变色，默认为true
-  final bool isGradientBg;
-
   @override
   _SliderGradientState createState() => _SliderGradientState();
 }
 
-class _SliderGradientState extends State<SliderGradient> {
-  double _thumbHeight;
-  double _thumbWidth;
-  double _sliderHeight;
-  Color _labelFillColor;
-  double _labelHeight;
+class _SliderGradientState extends State<SliderGradient>
+    with SingleTickerProviderStateMixin {
+  Duration _duration = Duration(milliseconds: 100); //动画时长
+  AnimationController controller;
+  double _sliderDefaultWidth = 150;
+  double _defaultWidth = 150;
+  double _sliderDefaultPadding = 20;
+  Color _thumbColor;
   Color _beginColor;
   Color _endColor;
-  Color _thumbColor;
-  double _leftLocation;
-  double _sliderWidth; //
-  double _sliderMinWidth = 140; //slider最小宽度
-  double _sliderSideWidth = 15;
-  double _sliderBorderRadius;
+  double _percent = 0;
+  double _labelHeight;
+  double _labelWidth = 100;
+  double _value;
   bool _isShowLabel = false; //手势控制时，label的状态
-  Color _primaryColor;
-  Duration _duration = Duration(milliseconds: 100); //动画时长
+
+  @override
+  void initState() {
+    super.initState();
+    controller = AnimationController(
+      duration: _duration,
+      vsync: this,
+    );
+    controller.value = 0;
+  }
 
   ///初始化执行方法
   void initData(BoxConstraints constraints) {
-    _primaryColor = Theme.of(context).primaryColor;
-    _sliderHeight = widget.sliderStyle.height;
-    _sliderBorderRadius = widget.sliderStyle.radius;
-    _beginColor = widget.colors?.first ?? _primaryColor;
+    if (constraints.maxWidth != double.infinity)
+      _sliderDefaultWidth = constraints.maxWidth;
+    _beginColor = widget.colors?.first ?? Theme.of(context).primaryColor;
     _endColor = widget.colors?.last ?? Color(0xffffffff);
-
+    _thumbColor = _beginColor;
     if (widget.colors == null) {
       widget.colors = [_beginColor, _endColor];
     }
-    _labelFillColor = widget.labelStyle.fillColor ?? _beginColor;
+    _defaultWidth = _sliderDefaultWidth - 2 * _sliderDefaultPadding;
     _labelHeight = labelTextHeight(
         "${widget.label ?? widget.value}", widget.labelStyle.size);
-    _thumbHeight = widget.thumbStyle.height;
-    _thumbWidth = widget.thumbStyle.width;
-    if (constraints.maxWidth == double.infinity)
-      _sliderWidth = _sliderMinWidth - _thumbWidth - 2 * _sliderSideWidth;
-    else
-      _sliderWidth = constraints.maxWidth - _thumbWidth - 2 * _sliderSideWidth;
-    _leftLocation = ((widget.value - widget.min) / (widget.max - widget.min)) *
-            _sliderWidth -
-        _thumbWidth / 2;
-    _getthumbColor();
+    _location(widget.value);
   }
 
-  ///水平移动thumb
-  void _moveHrizontal(DragUpdateDetails val) {
-    double _dx = val.localPosition.dx;
-    _changethumbLocation(_dx);
-    _getThumbVal(_leftLocation);
+  void _tapDown(TapDownDetails details) {
+    double _dx = details.localPosition.dx;
+    _thumbLocation(_dx);
+    _isShowLabelClick(true);
+    if (widget.onChange != null) widget.onChange(dataCallback());
   }
 
-  ///点击thumb
-  void handleClick(TapDownDetails val) {
-    double _dx = val.localPosition.dx;
-    _changethumbLocation(_dx);
-    _getThumbVal(_leftLocation);
+  void _tapUp(TapUpDetails details) {
+    if (widget.onChangeEnd != null) widget.onChangeEnd(dataCallback());
+    if (widget.onChange != null) widget.onChange(dataCallback());
+    _isShowLabelClick(false);
   }
 
-  ///根据点击位置，对thumb位置做变换
-  void _changethumbLocation(double val) {
-    if (val < _thumbWidth / 2 + _sliderSideWidth) {
-      _leftLocation = -_thumbWidth / 2;
-    } else if (val >= _sliderWidth + _thumbWidth + _sliderSideWidth) {
-      _leftLocation = _sliderWidth;
+  void _horizontalDragStart(DragStartDetails details) {
+    if (widget.onChangeBegin != null) widget.onChangeBegin(dataCallback());
+  }
+
+  void _horizontalDragUpdate(DragUpdateDetails details) {
+    double _dx = details.localPosition.dx;
+    _thumbLocation(_dx);
+    controller.value += details.primaryDelta / _defaultWidth;
+    if (widget.onChange != null) widget.onChange(dataCallback());
+  }
+
+  void _horizontalDragEnd(DragEndDetails details) {
+    if (widget.onChangeEnd != null) widget.onChangeEnd(dataCallback());
+    if (widget.onChange != null) widget.onChange(dataCallback());
+    _isShowLabelClick(false);
+  }
+
+  void _thumbLocation(double val) {
+    if (val <= _sliderDefaultPadding) {
+      controller.value = 0;
+      _percent = 0;
+    } else if (val >= _sliderDefaultPadding + _defaultWidth) {
+      controller.value = 1;
+      _percent = 1;
     } else {
-      _leftLocation = val - _thumbWidth - _sliderSideWidth;
+      _percent = _toAsFixed((val - _sliderDefaultPadding) / _defaultWidth, 4);
+      controller.animateTo(_percent);
     }
+    _value = _valueTransform(_percent);
+    _getThumbColor();
   }
 
-  ///根据thumb当前位置返回对应数值
-  void _getThumbVal(double val) {
-    int _currentVal = (((_leftLocation + _thumbWidth / 2) / _sliderWidth) *
-            (widget.max - widget.min))
-        .ceil();
-    if (_currentVal <= widget.min / 100) {
-      widget.value = widget.min;
-    } else if (_currentVal >= widget.max - widget.min * 101 / 100) {
-      widget.value = widget.max;
-    } else {
-      widget.value = _currentVal + widget.min;
-    }
-    _getthumbColor();
+  ///根据传入值确定thumb位置
+  void _location(double val) {
+    _percent = _toAsFixed((val - widget.min) / (widget.max - widget.min), 2);
+    controller.value = _percent;
+    _value = _valueTransform(_percent);
+    _getThumbColor();
   }
 
   ///thumb颜色获取
-  void _getthumbColor() {
+  void _getThumbColor() {
     if (!widget.isGradientBg ||
         widget.colors == null ||
         widget.colors.length < 2) {
       _thumbColor = _beginColor;
       return;
     }
-    double _percent = ((_leftLocation + _thumbWidth / 2) / _sliderWidth);
     int _len = widget.colors?.length ?? 2;
     _thumbColor = _lerp(_len, _percent);
   }
 
-  ///判断数据变化时是否显示label
-  void _isShowLabelClick(bool val) {
-    if (widget.isShowLabel) _isShowLabel = val;
+  double _valueTransform(double val) {
+    double _res = val * (widget.max - widget.min) + widget.min;
+    return _toAsFixed(_res, 2);
+  }
+
+  double _toAsFixed(double val, int digit) {
+    return double.parse(val.toStringAsFixed(digit));
   }
 
   ///根据百分比求出前后颜色
@@ -183,6 +197,157 @@ class _SliderGradientState extends State<SliderGradient> {
     }
     return Color.lerp(widget.colors[_num - 1], widget.colors[_num],
         ((percent - (_num - 1) / _denominator) * _denominator).toDouble());
+  }
+
+  SliderData dataCallback() {
+    return SliderData(color: _thumbColor, value: _value);
+  }
+
+  ///判断数据变化时是否显示label
+  void _isShowLabelClick(bool val) {
+    if (widget.isShowLabel) _isShowLabel = val;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        initData(constraints);
+        return ConstrainedBox(
+          constraints: BoxConstraints(
+              minWidth: _sliderDefaultWidth,
+              maxHeight: widget.sliderStyle.height > widget.thumbStyle.height
+                  ? widget.sliderStyle.height
+                  : widget.thumbStyle.height),
+          child: GestureDetector(
+              onTapDown: _tapDown,
+              onTapUp: _tapUp,
+              onHorizontalDragStart: _horizontalDragStart,
+              onHorizontalDragUpdate: _horizontalDragUpdate,
+              onHorizontalDragEnd: _horizontalDragEnd,
+              child: Container(
+                  child: AnimatedBuilder(
+                animation: controller,
+                builder: (BuildContext context, Widget child) {
+                  return Container(
+                      padding: EdgeInsets.only(
+                          left: _sliderDefaultPadding,
+                          right: _sliderDefaultPadding),
+                      child: Stack(
+                        alignment: AlignmentDirectional.centerStart,
+                        children: [
+                          //background
+                          backgroundWidget(),
+                          thumbWidget(),
+                        ],
+                      ));
+                },
+                child: Container(
+                  width: widget.thumbStyle.width,
+                  height: widget.thumbStyle.height,
+                  color: Colors.black26,
+                ),
+              ))),
+        );
+      },
+    );
+  }
+
+  //thumb
+  Widget thumbWidget() {
+    return CustomSingleChildLayout(
+        delegate: _ModalSliderLayout(_percent, true, widget.thumbStyle.width),
+        child: Stack(
+            alignment: AlignmentDirectional.centerStart,
+            clipBehavior: Clip.none,
+            children: [
+              labelWidget(),
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.all(
+                      Radius.circular(widget.thumbStyle.radius)),
+                  color: _thumbColor,
+                  border: Border.all(
+                      color: widget.thumbStyle.borderColor, width: 2),
+                ),
+                width: widget.thumbStyle.width,
+                height: widget.thumbStyle.height,
+              ),
+            ]));
+  }
+
+  ///label
+  Widget labelWidget() {
+    return Positioned(
+      left: -_labelWidth / 2 + widget.thumbStyle.width / 2,
+      top: -_labelHeight - 15,
+      child: Offstage(
+        offstage: !_isShowLabel,
+        child: Container(
+          alignment: Alignment.center,
+          width: _labelWidth,
+          child: Column(
+            children: [
+              Container(
+                padding: EdgeInsets.only(left: 6, right: 6, top: 4, bottom: 4),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.all(Radius.circular(4)),
+                  color: widget.labelStyle.fillColor ?? _beginColor,
+                ),
+                child: Text("${widget.label ?? _value}",
+                    overflow: TextOverflow.ellipsis, style: labelStyle()),
+              ),
+              Transform.translate(
+                offset: Offset(0, -5),
+                child: Transform.rotate(
+                  angle: pi / 4,
+                  child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.all(Radius.circular(2)),
+                        color: widget.labelStyle.fillColor ?? _beginColor,
+                      )),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  ///background
+  Widget backgroundWidget() {
+    return Container(
+      width: double.infinity,
+      height: widget.sliderStyle.height,
+      decoration: BoxDecoration(
+          borderRadius:
+              BorderRadius.all(Radius.circular(widget.sliderStyle.radius)),
+          gradient: widget.isGradientBg
+              ? LinearGradient(colors: widget.colors)
+              : null,
+          color: widget.isGradientBg ? null : _endColor),
+      child: !widget.isGradientBg
+          ? Row(
+              children: [
+                sliderItem(),
+              ],
+            )
+          : null,
+    );
+  }
+
+  ///slider 纯色背景
+  Widget sliderItem() {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(widget.sliderStyle.radius),
+      child: Container(
+        width: _defaultWidth * _percent,
+        color: _beginColor,
+      ),
+    );
   }
 
   ///label样式
@@ -208,186 +373,16 @@ class _SliderGradientState extends State<SliderGradient> {
     //文字的宽度:painter.width
     return painter.height;
   }
-
-  ///slider 纯色背景
-  Widget sliderItem() {
-    if (_sliderWidth == null || _leftLocation == null) return Container();
-    double _width = _leftLocation + _thumbWidth / 2;
-    Color _color;
-    _color = _beginColor;
-    _width = _width > _sliderWidth ? _sliderWidth : _width;
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(_sliderBorderRadius),
-      child: AnimatedContainer(
-        width: _width,
-        duration: _duration,
-        color: _color,
-      ),
-    );
-  }
-
-  ///获取当前参数添加到回调函数内
-  SliderData dataCallback() {
-    return SliderData(thumbColor: _thumbColor, value: widget.value);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-        builder: (BuildContext context, BoxConstraints constraints) {
-      initData(constraints);
-      return ConstrainedBox(
-        constraints: BoxConstraints(minWidth: _sliderMinWidth),
-        child: GestureDetector(
-          onTapDown: (val) {
-            handleClick(val);
-            _isShowLabelClick(true);
-            if (widget.onChange != null) widget.onChange(dataCallback());
-          },
-          onTapUp: (val) {
-            if (widget.onChangeEnd != null) widget.onChangeEnd(dataCallback());
-            if (widget.onChange != null) widget.onChange(dataCallback());
-            _isShowLabelClick(false);
-          },
-          onHorizontalDragStart: (val) {
-            if (widget.onChangeBegin != null)
-              widget.onChangeBegin(dataCallback());
-          },
-          onHorizontalDragUpdate: (val) {
-            _moveHrizontal(val);
-            if (widget.onChange != null) widget.onChange(dataCallback());
-          },
-          onHorizontalDragEnd: (val) {
-            if (widget.onChangeEnd != null) widget.onChangeEnd(dataCallback());
-            if (widget.onChange != null) widget.onChange(dataCallback());
-            _isShowLabelClick(false);
-          },
-          child: Container(
-            // color: Colors.red,
-            padding: EdgeInsets.only(
-                left: _thumbWidth / 2 + _sliderSideWidth,
-                right: _thumbWidth / 2 + _sliderSideWidth),
-            height: _sliderHeight > _thumbHeight ? _sliderHeight : _thumbHeight,
-            width: _sliderWidth + _thumbWidth + 2 * _sliderSideWidth,
-            child: Stack(
-              clipBehavior: Clip.none,
-              alignment: AlignmentDirectional.center,
-              children: [
-                //background
-                backgroundWidget(),
-                //label
-                _leftLocation != null
-                    ? _isShowLabel
-                        ? labelWidget()
-                        : Container()
-                    : Container(),
-                //thumb
-                thumbWidget()
-              ],
-            ),
-          ),
-        ),
-      );
-    });
-  }
-
-  ///background
-  Widget backgroundWidget() {
-    return Container(
-      width: double.infinity,
-      height: _sliderHeight,
-      decoration: BoxDecoration(
-          borderRadius: BorderRadius.all(Radius.circular(_sliderBorderRadius)),
-          gradient: widget.isGradientBg
-              ? LinearGradient(
-                  colors: widget.colors == null || widget.colors.length < 2
-                      ? [_beginColor, _endColor]
-                      : widget.colors)
-              : null,
-          color: widget.isGradientBg ? null : _endColor),
-      child: !widget.isGradientBg
-          ? Row(
-              children: [
-                sliderItem(),
-              ],
-            )
-          : null,
-    );
-  }
-
-  ///thumb
-  Widget thumbWidget() {
-    return AnimatedPositioned(
-      duration: _duration,
-      left: _leftLocation,
-      child: Column(
-        children: [
-          _leftLocation != null
-              ? AnimatedContainer(
-                  duration: _duration,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.all(
-                        Radius.circular(widget.thumbStyle.radius)),
-                    color: _thumbColor ?? _beginColor,
-                    border: Border.all(
-                        color: widget.thumbStyle.borderColor, width: 2),
-                  ),
-                  width: _thumbWidth,
-                  height: _thumbHeight,
-                )
-              : Container(),
-        ],
-      ),
-    );
-  }
-
-  ///label
-  Widget labelWidget() {
-    return AnimatedPositioned(
-      duration: _duration,
-      left: _leftLocation - 50 + _thumbWidth / 2,
-      top: -_labelHeight - 15,
-      child: Container(
-        width: 100,
-        child: Column(
-          children: [
-            Container(
-              padding: EdgeInsets.only(left: 6, right: 6, top: 4, bottom: 4),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.all(Radius.circular(4)),
-                color: _labelFillColor,
-              ),
-              child:
-                  Text("${widget.label ?? widget.value}", style: labelStyle()),
-            ),
-            Transform.translate(
-              offset: Offset(0, -5),
-              child: Transform.rotate(
-                angle: pi / 4,
-                child: Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.all(Radius.circular(2)),
-                      color: _labelFillColor,
-                    )),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 class SliderData {
-  SliderData({this.thumbColor, this.value});
-  int value; //选中数值
-  Color thumbColor; //选中颜色
+  SliderData({this.color, this.value});
+  double value; //选中数值
+  Color color; //选中颜色
 }
 
 class SliderStyle {
-  const SliderStyle({this.height = 16, this.radius = 4});
+  const SliderStyle({this.height = 16, this.radius = 4}) : assert(height >= 1);
 
   ///slider高度
   final double height;
@@ -415,7 +410,9 @@ class ThumbStyle {
       {this.borderColor = const Color(0xffE6E6E6),
       this.width = 16,
       this.height = 32,
-      this.radius = 4});
+      this.radius = 4})
+      : assert(width >= 6),
+        assert(height >= 6);
 
   ///thumb高度
   final double height;
@@ -428,4 +425,32 @@ class ThumbStyle {
 
   ///thumb 边框颜色
   final Color borderColor;
+}
+
+class _ModalSliderLayout extends SingleChildLayoutDelegate {
+  _ModalSliderLayout(this.progress, this.isScrollControlled, this.thumbWidth);
+
+  final double progress;
+  final bool isScrollControlled;
+  final double thumbWidth;
+
+  @override
+  BoxConstraints getConstraintsForChild(BoxConstraints constraints) {
+    return BoxConstraints(
+      minWidth: 0,
+      maxWidth: constraints.maxWidth,
+      minHeight: constraints.maxHeight,
+      // maxHeight: constraints.maxHeight,
+    );
+  }
+
+  @override
+  Offset getPositionForChild(Size size, Size childSize) {
+    return Offset(size.width * progress - thumbWidth / 2, 0);
+  }
+
+  // @override
+  bool shouldRelayout(_ModalSliderLayout oldDelegate) {
+    return progress != oldDelegate.progress;
+  }
 }
