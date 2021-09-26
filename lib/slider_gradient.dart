@@ -19,7 +19,8 @@ class SliderGradient extends StatefulWidget {
       @required this.value,
       @required this.onChange,
       this.onChangeBegin,
-      this.onChangeEnd})
+      this.onChangeEnd,
+      this.disabled = false})
       : assert(value != null),
         assert(min != null),
         assert(max != null),
@@ -31,10 +32,10 @@ class SliderGradient extends StatefulWidget {
   double value;
 
   ///最小值
-  final int min;
+  final double min;
 
   ///最大值
-  final int max;
+  final double max;
 
   ///数据发生变化
   final SliderChangeCallback onChange;
@@ -67,6 +68,9 @@ class SliderGradient extends StatefulWidget {
 
   ///thumb样式
   final ThumbStyle thumbStyle;
+
+  ///空件为禁用状态
+  bool disabled;
 
   @override
   _SliderGradientState createState() => _SliderGradientState();
@@ -111,6 +115,10 @@ class _SliderGradientState extends State<SliderGradient>
     _defaultWidth = _sliderDefaultWidth - 2 * _sliderDefaultPadding;
     _labelHeight = labelTextHeight(
         "${widget.label ?? widget.value}", widget.labelStyle.size);
+    if (widget.max == widget.min) {
+      widget.disabled = true;
+      return;
+    }
     _location(widget.value);
   }
 
@@ -123,7 +131,7 @@ class _SliderGradientState extends State<SliderGradient>
 
   void _tapUp(TapUpDetails details) {
     if (widget.onChangeEnd != null) widget.onChangeEnd(dataCallback());
-    if (widget.onChange != null) widget.onChange(dataCallback());
+    // if (widget.onChange != null) widget.onChange(dataCallback());
     _isShowLabelClick(false);
   }
 
@@ -213,41 +221,49 @@ class _SliderGradientState extends State<SliderGradient>
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints constraints) {
         initData(constraints);
-        return ConstrainedBox(
-          constraints: BoxConstraints(
-              minWidth: _sliderDefaultWidth,
-              maxHeight: widget.sliderStyle.height > widget.thumbStyle.height
-                  ? widget.sliderStyle.height
-                  : widget.thumbStyle.height),
-          child: GestureDetector(
-              onTapDown: _tapDown,
-              onTapUp: _tapUp,
-              onHorizontalDragStart: _horizontalDragStart,
-              onHorizontalDragUpdate: _horizontalDragUpdate,
-              onHorizontalDragEnd: _horizontalDragEnd,
-              child: Container(
-                  child: AnimatedBuilder(
-                animation: controller,
-                builder: (BuildContext context, Widget child) {
-                  return Container(
-                      padding: EdgeInsets.only(
-                          left: _sliderDefaultPadding,
-                          right: _sliderDefaultPadding),
-                      child: Stack(
-                        alignment: AlignmentDirectional.centerStart,
-                        children: [
-                          //background
-                          backgroundWidget(),
-                          thumbWidget(),
-                        ],
-                      ));
-                },
-                child: Container(
-                  width: widget.thumbStyle.width,
-                  height: widget.thumbStyle.height,
-                  color: Colors.black26,
-                ),
-              ))),
+        return Opacity(
+          opacity: widget.disabled ? .6 : 1,
+          child: AbsorbPointer(
+            absorbing: widget.disabled,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                  minWidth: _sliderDefaultWidth,
+                  maxHeight:
+                      widget.sliderStyle.height > widget.thumbStyle.height
+                          ? widget.sliderStyle.height
+                          : widget.thumbStyle.height),
+              child: GestureDetector(
+                  onTapDown: _tapDown,
+                  onTapUp: _tapUp,
+                  onHorizontalDragStart: _horizontalDragStart,
+                  onHorizontalDragUpdate: _horizontalDragUpdate,
+                  onHorizontalDragEnd: _horizontalDragEnd,
+                  child: Container(
+                      child: AnimatedBuilder(
+                    animation: controller,
+                    builder: (BuildContext context, Widget child) {
+                      return Container(
+                          color: Colors.transparent,
+                          padding: EdgeInsets.only(
+                              left: _sliderDefaultPadding,
+                              right: _sliderDefaultPadding),
+                          child: Stack(
+                            alignment: AlignmentDirectional.centerStart,
+                            children: [
+                              //background
+                              backgroundWidget(),
+                              thumbWidget(),
+                            ],
+                          ));
+                    },
+                    child: Container(
+                      width: widget.thumbStyle.width,
+                      height: widget.thumbStyle.height,
+                      color: Colors.black26,
+                    ),
+                  ))),
+            ),
+          ),
         );
       },
     );
