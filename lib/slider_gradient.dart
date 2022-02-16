@@ -5,27 +5,34 @@ import 'package:flutter/material.dart';
 typedef SliderChangeCallback(SliderData data);
 
 class SliderGradient extends StatefulWidget {
-  SliderGradient(
-      {Key key,
-      this.label,
-      this.thumbStyle = const ThumbStyle(),
-      this.labelStyle = const LabelStyle(),
-      this.sliderStyle = const SliderStyle(),
-      this.isGradientBg = true,
-      this.colors,
-      this.min = 0,
-      this.max = 100,
-      this.isShowLabel = false,
-      @required this.value,
-      @required this.onChange,
-      this.onChangeBegin,
-      this.onChangeEnd,
-      this.disabled = false})
-      : assert(value != null),
+  SliderGradient({
+    Key key,
+    this.label,
+    this.thumbStyle = const ThumbStyle(),
+    this.labelStyle = const LabelStyle(),
+    this.sliderStyle = const SliderStyle(),
+    this.isGradientBg = true,
+    this.colors,
+    this.min = 0,
+    this.max = 100,
+    this.isShowLabel = false,
+    this.isRange = false,
+    this.values,
+    @required this.value,
+    @required this.onChange,
+    this.onChangeBegin,
+    this.onChangeEnd,
+    this.divisions,
+  })  : assert(isRange ? true : value != null),
         assert(min != null),
         assert(max != null),
-        assert(min <= max),
-        assert(value >= min && value <= max),
+        assert(min < max),
+        assert(isRange ? true : value >= min && value <= max),
+        assert(isRange
+            ? values != null &&
+                values.length == 2 &&
+                values.first <= values.last
+            : true),
         super(key: key);
 
   ///默认值
@@ -69,8 +76,16 @@ class SliderGradient extends StatefulWidget {
   ///thumb样式
   final ThumbStyle thumbStyle;
 
-  ///空件为禁用状态
-  bool disabled;
+  ///whether to use the range
+  ///是否使用范围选择，默认为否
+  final bool isRange;
+
+  ///isRange = true, values must be passed as a valid value and cannot be empty
+  ///当isRange=true时,values必须传如有效值且不能为空，
+  List<double> values;
+
+  ///TODO 将滑动条几等分
+  int divisions;
 
   @override
   _SliderGradientState createState() => _SliderGradientState();
@@ -82,14 +97,17 @@ class _SliderGradientState extends State<SliderGradient>
   AnimationController controller;
   double _sliderDefaultWidth = 150;
   double _defaultWidth = 150;
-  double _sliderDefaultPadding = 20;
+  double _sliderDefaultPadding = 15;
   Color _thumbColor;
+  Color _thumbColorR;
   Color _beginColor;
   Color _endColor;
   double _percent = 0;
+  double _percentR = 0;
   double _labelHeight;
   double _labelWidth = 100;
   double _value;
+  double _valueR;
   bool _isShowLabel = false; //手势控制时，label的状态
 
   @override
@@ -100,6 +118,7 @@ class _SliderGradientState extends State<SliderGradient>
       vsync: this,
     );
     controller.value = 0;
+    _isShowLabel = widget.isShowLabel;
   }
 
   ///初始化执行方法
@@ -109,30 +128,40 @@ class _SliderGradientState extends State<SliderGradient>
     _beginColor = widget.colors?.first ?? Theme.of(context).primaryColor;
     _endColor = widget.colors?.last ?? Color(0xffffffff);
     _thumbColor = _beginColor;
+    _thumbColorR = _endColor;
     if (widget.colors == null) {
       widget.colors = [_beginColor, _endColor];
     }
     _defaultWidth = _sliderDefaultWidth - 2 * _sliderDefaultPadding;
     _labelHeight = labelTextHeight(
         "${widget.label ?? widget.value}", widget.labelStyle.size);
-    if (widget.max == widget.min) {
-      widget.disabled = true;
-      return;
+    if (widget.isRange) {
+      _location(widget.values.first, type: RangeType.left);
+      _location(widget.values.last, type: RangeType.right);
+    } else {
+      _location(widget.value);
     }
-    _location(widget.value);
+    widget.divisions =
+        widget.divisions ?? _doubleToInt(widget.max - widget.min);
+  }
+
+  ///double转int
+  int _doubleToInt(double val) {
+    if (val == null) return 0;
+    return int.parse(val.toString().split(".")[0]) ?? 0;
   }
 
   void _tapDown(TapDownDetails details) {
     double _dx = details.localPosition.dx;
     _thumbLocation(_dx);
-    _isShowLabelClick(true);
+    // _isShowLabelClick(true);
     if (widget.onChange != null) widget.onChange(dataCallback());
   }
 
   void _tapUp(TapUpDetails details) {
     if (widget.onChangeEnd != null) widget.onChangeEnd(dataCallback());
     // if (widget.onChange != null) widget.onChange(dataCallback());
-    _isShowLabelClick(false);
+    // _isShowLabelClick(false);
   }
 
   void _horizontalDragStart(DragStartDetails details) {
@@ -143,48 +172,96 @@ class _SliderGradientState extends State<SliderGradient>
     double _dx = details.localPosition.dx;
     _thumbLocation(_dx);
     controller.value += details.primaryDelta / _defaultWidth;
+
     if (widget.onChange != null) widget.onChange(dataCallback());
   }
 
   void _horizontalDragEnd(DragEndDetails details) {
     if (widget.onChangeEnd != null) widget.onChangeEnd(dataCallback());
-    if (widget.onChange != null) widget.onChange(dataCallback());
-    _isShowLabelClick(false);
+    // if (widget.onChange != null) widget.onChange(dataCallback());
+    // _isShowLabelClick(false);
   }
 
   void _thumbLocation(double val) {
+    double per;
+    RangeType type = RangeType.left;
     if (val <= _sliderDefaultPadding) {
       controller.value = 0;
       _percent = 0;
     } else if (val >= _sliderDefaultPadding + _defaultWidth) {
       controller.value = 1;
-      _percent = 1;
+      if (widget.isRange) {
+        _percentR = 1;
+        type = RangeType.right;
+      } else {
+        _percent = 1;
+      }
     } else {
-      _percent = _toAsFixed((val - _sliderDefaultPadding) / _defaultWidth, 4);
-      controller.animateTo(_percent);
+      per = _toAsFixed((val - _sliderDefaultPadding) / _defaultWidth, 2);
+      type = _rangeLocation(per);
+      type == RangeType.left ? _percent = per : _percentR = per;
+      controller.animateTo(per);
     }
-    _value = _valueTransform(_percent);
-    _getThumbColor();
+
+    type == RangeType.left
+        ? _value = _valueTransform(_percent)
+        : _valueR = _valueTransform(_percentR);
+    _getThumbColor(type: type);
+  }
+
+  ///根据出入值确定移动哪个thumb
+  RangeType _rangeLocation(double val) {
+    if (!widget.isRange) return RangeType.left;
+    double _len = (val - _percent).abs();
+    double _lenR = (val - _percentR).abs();
+    if (_lenR > _len) {
+      return RangeType.left;
+    } else if (_percentR == _percent) {
+      if (val < _percent)
+        return RangeType.left;
+      else
+        return RangeType.right;
+    } else {
+      return RangeType.right;
+    }
   }
 
   ///根据传入值确定thumb位置
-  void _location(double val) {
-    _percent = _toAsFixed((val - widget.min) / (widget.max - widget.min), 2);
-    controller.value = _percent;
-    _value = _valueTransform(_percent);
-    _getThumbColor();
+  void _location(double val, {RangeType type}) {
+    double per = _toAsFixed((val - widget.min) / (widget.max - widget.min), 4);
+    switch (type) {
+      case RangeType.right:
+        _percentR = per;
+        controller.value = _percentR;
+        _valueR = _valueTransform(_percentR);
+        break;
+      default:
+        _percent = per;
+        controller.value = _percent;
+        _value = _valueTransform(_percent);
+        break;
+    }
+    _getThumbColor(type: type ?? RangeType.left);
   }
 
   ///thumb颜色获取
-  void _getThumbColor() {
+  void _getThumbColor({RangeType type}) {
     if (!widget.isGradientBg ||
         widget.colors == null ||
         widget.colors.length < 2) {
       _thumbColor = _beginColor;
+      _thumbColorR = _beginColor;
       return;
     }
     int _len = widget.colors?.length ?? 2;
-    _thumbColor = _lerp(_len, _percent);
+    switch (type) {
+      case RangeType.right:
+        _thumbColorR = _lerp(_len, _percentR);
+        break;
+      default:
+        _thumbColor = _lerp(_len, _percent);
+        break;
+    }
   }
 
   double _valueTransform(double val) {
@@ -208,7 +285,11 @@ class _SliderGradientState extends State<SliderGradient>
   }
 
   SliderData dataCallback() {
-    return SliderData(color: _thumbColor, value: _value);
+    if (widget.isRange)
+      return SliderData(
+          colors: [_thumbColor, _thumbColorR], values: [_value, _valueR]);
+    else
+      return SliderData(color: _thumbColor, value: _value);
   }
 
   ///判断数据变化时是否显示label
@@ -221,68 +302,68 @@ class _SliderGradientState extends State<SliderGradient>
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints constraints) {
         initData(constraints);
-        return Opacity(
-          opacity: widget.disabled ? .6 : 1,
-          child: AbsorbPointer(
-            absorbing: widget.disabled,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                  minWidth: _sliderDefaultWidth,
-                  maxHeight:
-                      widget.sliderStyle.height > widget.thumbStyle.height
-                          ? widget.sliderStyle.height
-                          : widget.thumbStyle.height),
-              child: GestureDetector(
-                  onTapDown: _tapDown,
-                  onTapUp: _tapUp,
-                  onHorizontalDragStart: _horizontalDragStart,
-                  onHorizontalDragUpdate: _horizontalDragUpdate,
-                  onHorizontalDragEnd: _horizontalDragEnd,
-                  child: Container(
-                      child: AnimatedBuilder(
-                    animation: controller,
-                    builder: (BuildContext context, Widget child) {
-                      return Container(
-                          color: Colors.transparent,
-                          padding: EdgeInsets.only(
-                              left: _sliderDefaultPadding,
-                              right: _sliderDefaultPadding),
-                          child: Stack(
-                            alignment: AlignmentDirectional.centerStart,
-                            children: [
-                              //background
-                              backgroundWidget(),
-                              thumbWidget(),
-                            ],
-                          ));
-                    },
-                    child: Container(
-                      width: widget.thumbStyle.width,
-                      height: widget.thumbStyle.height,
-                      color: Colors.black26,
-                    ),
-                  ))),
-            ),
-          ),
+        return ConstrainedBox(
+          constraints: BoxConstraints(
+              minWidth: _sliderDefaultWidth,
+              maxHeight: widget.sliderStyle.height > widget.thumbStyle.height
+                  ? widget.sliderStyle.height
+                  : widget.thumbStyle.height),
+          child: GestureDetector(
+              onTapDown: _tapDown,
+              onTapUp: _tapUp,
+              onHorizontalDragStart: _horizontalDragStart,
+              onHorizontalDragUpdate: _horizontalDragUpdate,
+              onHorizontalDragEnd: _horizontalDragEnd,
+              child: Container(
+                  child: AnimatedBuilder(
+                animation: controller,
+                builder: (BuildContext context, Widget child) {
+                  return Container(
+                      color: Colors.transparent,
+                      padding: EdgeInsets.only(
+                          left: _sliderDefaultPadding,
+                          right: _sliderDefaultPadding),
+                      child: Stack(
+                        alignment: AlignmentDirectional.centerStart,
+                        children: [
+                          //background
+                          backgroundWidget(),
+                          thumbWidget(true),
+                          Offstage(
+                            offstage: !widget.isRange,
+                            child: thumbWidget(false),
+                          )
+                        ],
+                      ));
+                },
+                child: Container(
+                  width: widget.thumbStyle.width,
+                  height: widget.thumbStyle.height,
+                  color: Colors.black26,
+                ),
+              ))),
         );
       },
     );
   }
 
-  //thumb
-  Widget thumbWidget() {
+  /* thumb
+  * isLeft 
+  */
+  Widget thumbWidget(bool isLeft) {
     return CustomSingleChildLayout(
-        delegate: _ModalSliderLayout(_percent, true, widget.thumbStyle.width),
+        delegate: _ModalSliderLayout(
+            isLeft ? _percent : _percentR, true, widget.thumbStyle.width),
         child: Stack(
             alignment: AlignmentDirectional.centerStart,
             clipBehavior: Clip.none,
             children: [
-              labelWidget(),
+              labelWidget(isLeft),
               Container(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.all(
                       Radius.circular(widget.thumbStyle.radius)),
-                  color: _thumbColor,
+                  color: isLeft ? _thumbColor : _thumbColorR,
                   border: Border.all(
                       color: widget.thumbStyle.borderColor, width: 2),
                 ),
@@ -293,7 +374,7 @@ class _SliderGradientState extends State<SliderGradient>
   }
 
   ///label
-  Widget labelWidget() {
+  Widget labelWidget(bool isLeft) {
     return Positioned(
       left: -_labelWidth / 2 + widget.thumbStyle.width / 2,
       top: -_labelHeight - 15,
@@ -308,9 +389,10 @@ class _SliderGradientState extends State<SliderGradient>
                 padding: EdgeInsets.only(left: 6, right: 6, top: 4, bottom: 4),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.all(Radius.circular(4)),
-                  color: widget.labelStyle.fillColor ?? _beginColor,
+                  color: widget.labelStyle.fillColor ??
+                      Theme.of(context).primaryColor,
                 ),
-                child: Text("${widget.label ?? _value}",
+                child: Text("${widget.label ?? (isLeft ? _value : _valueR)}",
                     overflow: TextOverflow.ellipsis, style: labelStyle()),
               ),
               Transform.translate(
@@ -322,7 +404,8 @@ class _SliderGradientState extends State<SliderGradient>
                       height: 8,
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.all(Radius.circular(2)),
-                        color: widget.labelStyle.fillColor ?? _beginColor,
+                        color: widget.labelStyle.fillColor ??
+                            Theme.of(context).primaryColor,
                       )),
                 ),
               ),
@@ -337,7 +420,7 @@ class _SliderGradientState extends State<SliderGradient>
   Widget backgroundWidget() {
     return Container(
       width: double.infinity,
-      height: widget.sliderStyle.height,
+      height: widget.sliderStyle?.height,
       decoration: BoxDecoration(
           borderRadius:
               BorderRadius.all(Radius.circular(widget.sliderStyle.radius)),
@@ -347,8 +430,10 @@ class _SliderGradientState extends State<SliderGradient>
           color: widget.isGradientBg ? null : _endColor),
       child: !widget.isGradientBg
           ? Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                sliderItem(),
+                sliderItem(_percent),
+                widget.isRange ? sliderItem(1 - _percentR) : Container(),
               ],
             )
           : null,
@@ -356,11 +441,11 @@ class _SliderGradientState extends State<SliderGradient>
   }
 
   ///slider 纯色背景
-  Widget sliderItem() {
+  Widget sliderItem(double percent) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(widget.sliderStyle.radius),
       child: Container(
-        width: _defaultWidth * _percent,
+        width: _defaultWidth * percent,
         color: _beginColor,
       ),
     );
@@ -391,10 +476,15 @@ class _SliderGradientState extends State<SliderGradient>
   }
 }
 
+enum RangeType { left, right }
+
 class SliderData {
-  SliderData({this.color, this.value});
+  SliderData({this.color, this.value, this.values, this.colors});
   double value; //选中数值
+  List<double> values; //选中数值范围
   Color color; //选中颜色
+  List<Color> colors; //选中颜色范围
+
 }
 
 class SliderStyle {
